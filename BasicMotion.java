@@ -50,11 +50,21 @@ public class BasicMotion extends PApplet {
         public void render() {
             renderShape(position, orientation);
             for (Pair<PVector, Float> crumb : breadcrumbs) {
-                renderShape(crumb.getLeft(), crumb.getRight());
+                renderBreadCrumb(crumb.getLeft());
+                //renderShape(crumb.getLeft(), crumb.getRight());
             }
-            if (counter % 10 == 0) {
+            if (counter % 3 == 0) {
                 breadcrumbs.add(Pair.of(new PVector(position.x, position.y), orientation));
             }
+        }
+
+        public void renderBreadCrumb(PVector pos) {
+            pushMatrix();
+            translate(pos.x, pos.y);
+            fill(0);
+            stroke(0);
+            ellipse(0, 0, 2, 2);
+            popMatrix();
         }
 
         public void renderShape(PVector pos, float orientation) {
@@ -62,10 +72,11 @@ public class BasicMotion extends PApplet {
             translate(pos.x, pos.y);
             rotate(orientation);
             PShape shape = createShape(GROUP);
-            PShape circle = createShape(ELLIPSE, 0, 0, 5, 5);
+            float radius = 7;
+            PShape circle = createShape(ELLIPSE, 0, 0, radius, radius);
             circle.setFill(0);
             circle.setStroke(0);
-            PShape triangle = createShape(TRIANGLE, 0, -2.5f, 0, 2.5f, 5, 0);
+            PShape triangle = createShape(TRIANGLE, 0, -radius/2.0f, 0, radius/2.0f, radius, 0);
             triangle.setFill(0);
             triangle.setStroke(0);
             shape.addChild(circle);
