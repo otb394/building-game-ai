@@ -5,10 +5,10 @@ import processing.core.PVector;
 import java.util.ArrayList;
 import java.util.List;
 
-public class KinematicMotion extends PApplet {
+public class BasicMotion extends PApplet {
     Boid boid;
     public static void main(String[] args) {
-        PApplet.main("KinematicMotion", args);
+        PApplet.main("BasicMotion", args);
     }
 
     public void settings() {
