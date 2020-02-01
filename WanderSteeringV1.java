@@ -5,10 +5,10 @@ import processing.core.PVector;
 import java.util.ArrayList;
 import java.util.List;
 
-public class WanderSteering extends PApplet {
+public class WanderSteeringV1 extends PApplet {
     Boid boid;
     public static void main(String[] args) {
-        PApplet.main("WanderSteering", args);
+        PApplet.main("WanderSteeringV1", args);
     }
 
     public void settings() {
@@ -117,7 +117,6 @@ public class WanderSteering extends PApplet {
                 target = PVector.random2D();
                 target.x = (width / 2.0f) * (target.x + 1);
                 target.y = (height / 2.0f) * (target.y + 1);
-                println(target);
             }
             arrive(target);
             counter++;
