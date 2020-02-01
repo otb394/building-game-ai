@@ -5,10 +5,10 @@ import processing.core.PVector;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ArriveSteering extends PApplet {
+public class ArriveSteeringV1 extends PApplet {
     Boid boid;
     public static void main(String[] args) {
-        PApplet.main("ArriveSteering", args);
+        PApplet.main("ArriveSteeringV1", args);
     }
 
     public void settings() {
