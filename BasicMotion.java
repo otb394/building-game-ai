@@ -22,10 +22,6 @@ public class BasicMotion extends PApplet {
     public void draw() {
         background(255);
         boid.run();
-//        stroke(0);
-//        fill(0);
-//        ellipse(mouseX, mouseY, 5, 5);
-//        triangle(mouseX, mouseY-2.5f, mouseX, mouseY+2.5f, mouseX+5, mouseY);
     }
 
     public class Boid {
