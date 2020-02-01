@@ -42,7 +42,7 @@ public class ArriveSteeringV2 extends PApplet {
         float slowDownRadius;
 
         public Boid() {
-            objectRadius = 1;
+            objectRadius = 5;
             padding = 10.0f;
             position = new PVector(width / 2.0f, height - padding);
             velocity = new PVector(2, 0);
