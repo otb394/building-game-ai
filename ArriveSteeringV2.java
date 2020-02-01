@@ -42,7 +42,7 @@ public class ArriveSteeringV2 extends PApplet {
         float slowDownRadius;
 
         public Boid() {
-            objectRadius = 5;
+            objectRadius = 1;
             padding = 10.0f;
             position = new PVector(width / 2.0f, height - padding);
             velocity = new PVector(2, 0);
@@ -124,11 +124,11 @@ public class ArriveSteeringV2 extends PApplet {
             PVector distance = PVector.sub(target, position);
             if (distance.mag() > objectRadius) {
                 float targetSpeed = (distance.mag() > slowDownRadius) ? (MAX_VELOCITY)
-                        : Math.min(distance.mag() / timeToTarget, MAX_VELOCITY);
+                        : (MAX_VELOCITY * (distance.mag() / slowDownRadius));
                 PVector targetVelocity = distance.copy().setMag(targetSpeed);
                 PVector deltaVelocity = PVector.sub(targetVelocity, velocity);
 
-                PVector acc = deltaVelocity.limit(MAX_ACCELERATION);
+                PVector acc = deltaVelocity.div(timeToTarget).limit(MAX_ACCELERATION);
                 applyForce(acc);
                 update();
                 checkBoundaries();
