@@ -5,10 +5,10 @@ import processing.core.PVector;
 import java.util.ArrayList;
 import java.util.List;
 
-public class WanderSteeringV1 extends PApplet {
+public class WanderSteeringV2 extends PApplet {
     Boid boid;
     public static void main(String[] args) {
-        PApplet.main("WanderSteeringV1", args);
+        PApplet.main("WanderSteeringV2", args);
     }
 
     public void settings() {
@@ -40,7 +40,6 @@ public class WanderSteeringV1 extends PApplet {
         int rateOfLeavingCrumbs;
         float timeToTarget;
         float slowDownRadius;
-        PVector targetVelocity;
 
         public Boid() {
             objectRadius = 5;
@@ -114,25 +113,13 @@ public class WanderSteeringV1 extends PApplet {
         }
 
         public void run() {
-            targetVelocity = getRandomVelocity();
-            PVector deltaVelocity = PVector.sub(targetVelocity, velocity);
-            PVector acc = deltaVelocity.div(timeToTarget).limit(MAX_ACCELERATION);
-            applyForce(acc);
-            update();
-            checkBoundaries();
-            render();
+            if (counter%10 == 0) {
+                target = PVector.random2D();
+                target.x = (width / 2.0f) * (target.x + 1);
+                target.y = (height / 2.0f) * (target.y + 1);
+            }
+            arrive(target);
             counter++;
-        }
-
-        private PVector getRandomVelocity() {
-            float velocityDirection = orientation + randomBinomial() * PI;
-            float speed = MAX_VELOCITY;
-            return PVector.fromAngle(velocityDirection).setMag(speed);
-            //return PVector.random2D().mult(MAX_VELOCITY);
-        }
-
-        private float randomBinomial() {
-            return random(0, 1) - random(0,1);
         }
 
         public void arrive(PVector target) {
