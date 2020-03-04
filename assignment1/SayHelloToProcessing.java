@@ -1,8 +1,10 @@
+package assignment1;
+
 import processing.core.PApplet;
 
 public class SayHelloToProcessing extends PApplet {
     public static void main(String[] args) {
-        PApplet.main("SayHelloToProcessing", args);
+        PApplet.main("assignment1.SayHelloToProcessing", args);
     }
 
     public void draw() {

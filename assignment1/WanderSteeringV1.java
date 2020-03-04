@@ -1,3 +1,5 @@
+package assignment1;
+
 import processing.core.PApplet;
 import processing.core.PShape;
 import processing.core.PVector;
@@ -5,10 +7,10 @@ import processing.core.PVector;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ArriveSteeringV2 extends PApplet {
+public class WanderSteeringV1 extends PApplet {
     Boid boid;
     public static void main(String[] args) {
-        PApplet.main("ArriveSteeringV2", args);
+        PApplet.main("assignment1.WanderSteeringV1", args);
     }
 
     public void settings() {
@@ -40,6 +42,7 @@ public class ArriveSteeringV2 extends PApplet {
         int rateOfLeavingCrumbs;
         float timeToTarget;
         float slowDownRadius;
+        PVector targetVelocity;
 
         public Boid() {
             objectRadius = 5;
@@ -51,7 +54,7 @@ public class ArriveSteeringV2 extends PApplet {
             breadcrumbs = new ArrayList<>();
             counter = 0;
             MAX_VELOCITY = 8;
-            MAX_ACCELERATION = 0.1f;
+            MAX_ACCELERATION = 2f;
             DRAG = 0.05f;
             target = new PVector(width / 2.0f, height / 2.0f);
             rateOfLeavingCrumbs = 1;
@@ -74,7 +77,7 @@ public class ArriveSteeringV2 extends PApplet {
             translate(pos.x, pos.y);
             fill(0);
             stroke(0);
-            ellipse(0, 0, 2, 2);
+            ellipse(0, 0, 1, 1);
             popMatrix();
         }
 
@@ -83,7 +86,7 @@ public class ArriveSteeringV2 extends PApplet {
             translate(pos.x, pos.y);
             rotate(orientation);
             PShape shape = createShape(GROUP);
-            float radius = 7;
+            float radius = 10;
             PShape circle = createShape(ELLIPSE, 0, 0, radius, radius);
             circle.setFill(0);
             circle.setStroke(0);
@@ -113,11 +116,25 @@ public class ArriveSteeringV2 extends PApplet {
         }
 
         public void run() {
+            targetVelocity = getRandomVelocity();
+            PVector deltaVelocity = PVector.sub(targetVelocity, velocity);
+            PVector acc = deltaVelocity.div(timeToTarget).limit(MAX_ACCELERATION);
+            applyForce(acc);
+            update();
+            checkBoundaries();
+            render();
             counter++;
-            if (mousePressed) {
-                target = new PVector(mouseX, mouseY);
-            }
-            arrive(target);
+        }
+
+        private PVector getRandomVelocity() {
+            float velocityDirection = orientation + randomBinomial() * PI;
+            float speed = MAX_VELOCITY;
+            return PVector.fromAngle(velocityDirection).setMag(speed);
+            //return PVector.random2D().mult(MAX_VELOCITY);
+        }
+
+        private float randomBinomial() {
+            return random(0, 1) - random(0,1);
         }
 
         public void arrive(PVector target) {

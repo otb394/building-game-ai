@@ -1,3 +1,5 @@
+package assignment1;
+
 import processing.core.PApplet;
 import processing.core.PShape;
 import processing.core.PVector;
@@ -5,10 +7,10 @@ import processing.core.PVector;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BasicMotion extends PApplet {
+public class ArriveSteeringV1 extends PApplet {
     Boid boid;
     public static void main(String[] args) {
-        PApplet.main("BasicMotion", args);
+        PApplet.main("assignment1.ArriveSteeringV1", args);
     }
 
     public void settings() {
@@ -25,36 +27,47 @@ public class BasicMotion extends PApplet {
     }
 
     public class Boid {
-        PVector initialPosition;
+        float objectRadius;
+        float padding;
+        PVector target;
+        float MAX_VELOCITY;
+        float MAX_ACCELERATION;
+        float DRAG;
         PVector position;
         PVector velocity;
         float orientation;
         boolean stopMotion;
         List<Pair<PVector, Float>> breadcrumbs;
         int counter;
+        int rateOfLeavingCrumbs;
 
         public Boid() {
-            initialPosition = new PVector(10, 390);
-            position = new PVector(10, 390);
+            objectRadius = 7;
+            padding = 10.0f;
+            position = new PVector(width / 2.0f, height - padding);
             velocity = new PVector(2, 0);
             orientation = 0.0f;
             stopMotion = false;
             breadcrumbs = new ArrayList<>();
             counter = 0;
+            MAX_VELOCITY = 8;
+            MAX_ACCELERATION = 0.1f;
+            DRAG = 0.05f;
+            target = new PVector(width / 2.0f, height / 2.0f);
+            rateOfLeavingCrumbs = 1;
         }
 
-        public void render() {
+        private void render() {
             renderShape(position, orientation);
             for (Pair<PVector, Float> crumb : breadcrumbs) {
                 renderBreadCrumb(crumb.getLeft());
-                //renderShape(crumb.getLeft(), crumb.getRight());
             }
-            if (counter % 3 == 0) {
+            if (counter % rateOfLeavingCrumbs == 0) {
                 breadcrumbs.add(Pair.of(new PVector(position.x, position.y), orientation));
             }
         }
 
-        public void renderBreadCrumb(PVector pos) {
+        private void renderBreadCrumb(PVector pos) {
             pushMatrix();
             translate(pos.x, pos.y);
             fill(0);
@@ -63,7 +76,7 @@ public class BasicMotion extends PApplet {
             popMatrix();
         }
 
-        public void renderShape(PVector pos, float orientation) {
+        private void renderShape(PVector pos, float orientation) {
             pushMatrix();
             translate(pos.x, pos.y);
             rotate(orientation);
@@ -72,7 +85,7 @@ public class BasicMotion extends PApplet {
             PShape circle = createShape(ELLIPSE, 0, 0, radius, radius);
             circle.setFill(0);
             circle.setStroke(0);
-            PShape triangle = createShape(TRIANGLE, 0, -radius/2.0f, 0, radius/2.0f, radius, 0);
+            PShape triangle = createShape(TRIANGLE, 0, -radius / 2.0f, 0, radius / 2.0f, radius, 0);
             triangle.setFill(0);
             triangle.setStroke(0);
             shape.addChild(circle);
@@ -81,36 +94,60 @@ public class BasicMotion extends PApplet {
             popMatrix();
         }
 
-        public void update() {
+        private void update() {
             position.add(velocity);
             orientation = velocity.heading();
         }
 
-        public PVector getNextPosition() {
-            return PVector.add(position, velocity);
+        private PVector getVelocity(PVector acc) {
+            PVector newVelocity = PVector.add(velocity, acc).limit(MAX_VELOCITY);
+            float mag = newVelocity.mag();
+            newVelocity.setMag(Math.max(mag - DRAG, 0));
+            return newVelocity;
+        }
+
+        private void applyForce(PVector acc) {
+            velocity = getVelocity(acc);
         }
 
         public void run() {
             counter++;
-            if (!stopMotion) {
-                PVector nextPos = getNextPosition();
-                checkBoundaries(nextPos);
+            if (mousePressed) {
+                target = new PVector(mouseX, mouseY);
+            }
+            arrive(target);
+        }
+
+        public void arrive(PVector target) {
+            PVector distance = PVector.sub(target, position);
+            if (distance.mag() > objectRadius) {
+                PVector acc = distance.copy().setMag(MAX_ACCELERATION);
+                applyForce(acc);
                 update();
+                checkBoundaries();
             }
             render();
-            if (checkStopping()) {
-                stopMotion = true;
-            }
         }
 
-        public void checkBoundaries(PVector nextPosition) {
-            if (nextPosition.x < 10 || nextPosition.x > 490 || nextPosition.y < 10 || nextPosition.y > 390) {
-                velocity.rotate(-HALF_PI);
+        private boolean checkBoundaries() {
+            boolean flag = false;
+            if (position.x < 0) {
+                position.x += width;
+                flag = true;
             }
-        }
-
-        public boolean checkStopping() {
-            return position.equals(initialPosition);
+            if (position.y < 0) {
+                position.y += height;
+                flag = true;
+            }
+            if (position.x > width) {
+                position.x -= width;
+                flag = true;
+            }
+            if (position.y > height) {
+                position.y -= height;
+                flag = true;
+            }
+            return flag;
         }
     }
 

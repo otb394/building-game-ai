@@ -1,3 +1,5 @@
+package assignment1;
+
 import processing.core.PApplet;
 import processing.core.PShape;
 import processing.core.PVector;
@@ -8,7 +10,7 @@ import java.util.List;
 public class WanderSteeringV2 extends PApplet {
     Boid boid;
     public static void main(String[] args) {
-        PApplet.main("WanderSteeringV2", args);
+        PApplet.main("assignment1.WanderSteeringV2", args);
     }
 
     public void settings() {
