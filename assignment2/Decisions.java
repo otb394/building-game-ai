@@ -8,6 +8,7 @@ import processing.data.JSONArray;
 import processing.data.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -33,6 +34,13 @@ public class Decisions extends PApplet {
     private Graph graph;
     private Map<PVector, Boolean> blockedCache;
     private int kingGold;
+    private List<Action> actionPlan;
+    private State initialState;
+    private int nextAction;
+    private String ownerOfFenrir;
+    private int noOfAction;
+    private boolean weWin;
+//    private int count;
 //    private PVector target;
 
     public static void main(String[] args) {
@@ -51,48 +59,48 @@ public class Decisions extends PApplet {
 //        target = null;
         int pixelLimit = 50;
         OBSTACLE_COLORS = new int[]{color(84,134,214), color(42, 176, 109), color(189, 109, 87)};
-        JSONObject json = loadJSONObject(sketchPath("data/mapTest3.json"));
+        JSONObject json = loadJSONObject(sketchPath("data/piazzaTestMap.json"));
         MyImage knightImg = new MyImage(loadImage(sketchPath("images/knight.png")), pixelLimit);
         Knight knight = new Knight(new PVector(json.getJSONArray("knight_start").getFloat(0),
                 json.getJSONArray("knight_start").getFloat(1)), knightImg,
-                "Knight");
-        this.knight = knight;
+                "Knight", "Starting position");
+        this.knight = knight.changePosition(knight.location);
         gameCharacterMap.put("Knight", knight);
 
         Optional.ofNullable(json.getJSONObject("key_locations").getJSONArray("castle"))
                 .map(arr -> new PVector(arr.getFloat(0), arr.getFloat(1)))
                 .map(pos -> new GameCharacter(pos,
-                        new MyImage(loadImage(sketchPath("images/castle.png")), pixelLimit), "King"))
+                        new MyImage(loadImage(sketchPath("images/castle.png")), pixelLimit), "King", "Maugrim Castle"))
                 .ifPresent(king -> gameCharacterMap.put("King", king));
         kingGold = json.getInt("greet_king");
 
         Optional.ofNullable(json.getJSONObject("key_locations").getJSONArray("tar_pit"))
                 .map(arr -> new PVector(arr.getFloat(0), arr.getFloat(1)))
                 .map(pos -> new GameCharacter(pos,
-                        new MyImage(loadImage(sketchPath("images/tarpit.jpg")), pixelLimit), "Rameses"))
+                        new MyImage(loadImage(sketchPath("images/tarpit.jpg")), pixelLimit), "Rameses", "Tar Pit"))
                 .ifPresent(rameses -> gameCharacterMap.put("Rameses", rameses));
 
         Optional.ofNullable(json.getJSONObject("key_locations").getJSONArray("tavern"))
                 .map(arr -> new PVector(arr.getFloat(0), arr.getFloat(1)))
                 .map(pos -> new GameCharacter(pos,
-                        new MyImage(loadImage(sketchPath("images/tavern.png")), pixelLimit), "Innkeeper"))
+                        new MyImage(loadImage(sketchPath("images/tavern.png")), pixelLimit), "Innkeeper", "Tavern"))
                 .ifPresent(innkeeper -> gameCharacterMap.put("Innkeeper", innkeeper));
 
         Optional.ofNullable(json.getJSONObject("key_locations").getJSONArray("cave"))
                 .map(arr -> new PVector(arr.getFloat(0), arr.getFloat(1)))
                 .map(pos -> new GameCharacter(pos,
-                        new MyImage(loadImage(sketchPath("images/cave.jpg")), pixelLimit), "Lady Lupa"))
+                        new MyImage(loadImage(sketchPath("images/cave.jpg")), pixelLimit), "Lady Lupa", "Ancient Cave"))
                 .ifPresent(ladyLupa -> gameCharacterMap.put("Lady Lupa", ladyLupa));
 
         Optional.ofNullable(json.getJSONObject("key_locations").getJSONArray("tree"))
                 .map(arr -> new PVector(arr.getFloat(0), arr.getFloat(1)))
                 .map(pos -> new GameCharacter(pos,
-                        new MyImage(loadImage(sketchPath("images/tree.png")), pixelLimit), "Tree Spirit"))
+                        new MyImage(loadImage(sketchPath("images/tree.png")), pixelLimit), "Tree Spirit", "Supernatural Forest"))
                 .ifPresent(treeSpirit -> gameCharacterMap.put("Tree Spirit", treeSpirit));
 
         Optional.ofNullable(json.getJSONObject("key_locations").getJSONArray("forge"))
                 .map(arr -> new PVector(arr.getFloat(0), arr.getFloat(1)))
-                .map(pos -> new GameCharacter(pos, new MyImage(loadImage(sketchPath("images/forge.png")), pixelLimit), "Blacksmith"))
+                .map(pos -> new GameCharacter(pos, new MyImage(loadImage(sketchPath("images/forge.png")), pixelLimit), "Blacksmith", "Forge"))
                 .ifPresent(blacksmith -> gameCharacterMap.put("Blacksmith", blacksmith));
         readGameState(json);
 
@@ -105,6 +113,49 @@ public class Decisions extends PApplet {
                 .collect(Collectors.toMap(obstacleNames::get,
                         ind -> getObstacle(obstacles, obstacleNames.get(ind), OBSTACLE_COLORS[ind % 3])));
         this.graph = getGraph();
+        Set<String> inactive = new HashSet<>();
+        for (GameCharacter gc: gameCharacterMap.values()) {
+            PVector tarPos = gc.location;
+            List<PVector> path = AStar(graph, vertex -> vertex.dist(tarPos), knight.location, tarPos);
+            if (path == null) {
+//                System.out.println(gc.name + "is unreachable");
+                inactive.add(gc.name);
+            }
+        }
+        this.initialState = new State(knight, inactive, false, ownerOfFenrir, false, false);
+        this.actionPlan = DFS(initialState);
+//        System.out.println("Action plan received = " + actionPlan);
+        if (actionPlan == null) {
+            this.weWin = false;
+            GameCharacter king = gameCharacterMap.get("King");
+            actionPlan = new ArrayList<>();
+            PVector kingsLocation = king.location;
+            if (knight.location.equals(kingsLocation)) {
+                Action greetAction = new Action(false, "Greet");
+                actionPlan.add(greetAction);
+            } else {
+                Action moveAction = new Move(false, "Move", knight, king);
+                Action greetAction = new Action(false, "Greet");
+                actionPlan.add(moveAction);
+                actionPlan.add(greetAction);
+            }
+            GameCharacter demon = gameCharacterMap.get("Rameses");
+            PVector demonLocation = demon.location;
+            if (knight.location.equals(demonLocation)) {
+                Action fightAction = new Action(false, "Fight");
+                actionPlan.add(fightAction);
+            } else {
+                Action moveAction = new Move(false, "Move", king, demon);
+                Action fightAction = new Action(false, "Fight");
+                actionPlan.add(moveAction);
+                actionPlan.add(fightAction);
+            }
+        } else {
+            this.weWin = true;
+            Collections.reverse(actionPlan);
+        }
+        this.nextAction = 0;
+        this.noOfAction = (actionPlan == null) ? (0) : actionPlan.size();
     }
 
     private void readGameState(JSONObject json) {
@@ -114,7 +165,11 @@ public class Decisions extends PApplet {
         for (int i = 0; i < hasSize; i++) {
             JSONArray elements = hasArr.getJSONArray(i);
             String characterName = elements.getString(0);
-            String object = elements.getString(1);
+            String object = elements.getString(1).replaceAll("\\s", "")
+                    .replaceAll("[0-9]", "");
+            if (object.equals("Fenrir")) {
+                ownerOfFenrir = characterName;
+            }
             GameCharacter character = gameCharacterMap.get(characterName);
             if (character != null) {
                 int value = character.has.getOrDefault(object, 0);
@@ -128,7 +183,7 @@ public class Decisions extends PApplet {
             String characterName = elements.getString(0);
             String object = elements.getString(1).replaceAll("\\s", "")
                     .replaceAll("[0-9]", "");
-            System.out.println("object = " + object);
+//            System.out.println("object = " + object);
             GameCharacter character = gameCharacterMap.get(characterName);
             if (character != null) {
                 int value = character.wants.getOrDefault(object, 0);
@@ -141,29 +196,54 @@ public class Decisions extends PApplet {
         public PVector location;
         public Map<String, Integer> has;
         public Map<String, Integer> wants;
-        public boolean isActive;
         public MyImage img;
         public String name;
+        public String locationName;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            GameCharacter character = (GameCharacter) o;
+            return Objects.equals(location, character.location) &&
+                    Objects.equals(has, character.has) &&
+                    Objects.equals(wants, character.wants) &&
+                    Objects.equals(name, character.name);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(location, has, wants, name);
+        }
+
+        public void print() {
+            System.out.println("location = " + location);
+            System.out.println("has = " + has);
+            System.out.println("wants = " + wants);
+            System.out.println("name = " + name);
+        }
 
         public void display() {
             img.display(location);
         }
 
-        public GameCharacter(PVector location,  MyImage img, String name) {
+        public GameCharacter(PVector location,  MyImage img, String name, String locationName) {
             this.location = location;
             this.has = new HashMap<>();
             this.wants = new HashMap<>();
             this.img = img;
             this.name = name;
+            this.locationName = locationName;
         }
 
         public GameCharacter(PVector location, Map<String, Integer> has, Map<String, Integer> wants, MyImage img,
-                             String name) {
+                             String name, String locationName) {
             this.location = location;
             this.has = has;
             this.wants = wants;
             this.img = img;
             this.name = name;
+            this.locationName = locationName;
         }
     }
 
@@ -244,8 +324,26 @@ public class Decisions extends PApplet {
     @Override
     public void draw() {
         background(255);
-        gameCharacterMap.values().forEach(GameCharacter::display);
+        gameCharacterMap.values().stream().filter(gc -> !gc.name.equals("Knight")).forEach(GameCharacter::display);
         obstacleMap.values().forEach(this::shape);
+        if (nextAction < noOfAction) {
+            Action currentAction = actionPlan.get(nextAction);
+            if (!currentAction.isSucceeded) {
+                currentAction.perform(knight, graph);
+                if (currentAction.isSucceeded) {
+                    if (currentAction.type.equals("Fight")) {
+                        if (weWin) {
+                            System.out.println("Knight defeated Rameses");
+                        } else {
+                            System.out.println("Knight died in battle");
+                        }
+                    }
+                    nextAction++;
+                }
+            } else {
+                nextAction++;
+            }
+        }
 //        if (mousePressed) {
 //            target = new PVector(mouseX, mouseY);
 //            knight.plan = AStar(graph, vertex -> vertex.dist(target), knight.currentPos, target);
@@ -256,19 +354,348 @@ public class Decisions extends PApplet {
 //        knight.display();
     }
 
-    private class Knight extends GameCharacter {
+    private static class State {
+        public Knight knight;
+        public Set<String> inactive;
+        public boolean isGreeted;
+        public String fenrirOwner;
+        public boolean hasFought;
+        public boolean hasWon;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            State state = (State) o;
+            return isGreeted == state.isGreeted &&
+                    hasFought == state.hasFought &&
+                    hasWon == state.hasWon &&
+                    Objects.equals(knight, state.knight) &&
+                    Objects.equals(inactive, state.inactive) &&
+                    Objects.equals(fenrirOwner, state.fenrirOwner);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(knight, inactive, isGreeted, fenrirOwner, hasFought, hasWon);
+        }
+
+        public void print() {
+            System.out.println("Knight");
+            knight.print();
+            System.out.println("inactive = " + inactive);
+            System.out.println("isGreeted = " + isGreeted);
+            System.out.println("fenrirOwner = " + fenrirOwner);
+            System.out.println("hasFought = " + hasFought);
+            System.out.println("hasWon = " + hasWon);
+        }
+
+        public State(Knight knight, Set<String> inactive, boolean isGreeted, String fenrirOwner, boolean hasFought,
+                     boolean hasWon) {
+            this.knight = knight;
+            this.inactive = inactive;
+            this.isGreeted = isGreeted;
+            this.fenrirOwner = fenrirOwner;
+            this.hasFought = hasFought;
+            this.hasWon = hasWon;
+        }
+
+        public List<Pair<State, Action>> getNextStates(Map<String, GameCharacter> gameCharacterMap, int kingGold) {
+//            System.out.println("====================");
+//            System.out.println("Current Knight");
+//            knight.print();
+            if (hasFought) {
+                return new ArrayList<>();
+            }
+            if (!isGreeted) {
+                GameCharacter king = gameCharacterMap.get("King");
+                PVector kingsLocation = king.location;
+//                System.out.println("kingsLocation = " + kingsLocation);
+                if (knight.location.equals(kingsLocation)) {
+                    List<Pair<State, Action>> path = new ArrayList<>();
+                    Action greetAction = new Action(false, "Greet");
+                    path.add(Pair.of(new State(knight.addObject("gold", kingGold), inactive, true,
+                            fenrirOwner, hasFought, hasWon), greetAction));
+                    return path;
+                } else {
+                    List<Pair<State, Action>> path = new ArrayList<>();
+                    Action moveAction = new Move(false, "Move", knight, king);
+                    path.add(Pair.of(new State(knight.changePosition(kingsLocation), inactive, isGreeted, fenrirOwner,
+                                    hasFought, hasWon), moveAction));
+                    return path;
+                }
+            }
+
+            List<Pair<State, Action>> plan = new ArrayList<>();
+            GameCharacter demon = gameCharacterMap.get("Rameses");
+            if (knight.location.equals(demon.location)) {
+                Action fightAction = new Action(false, "Fight");
+                //Is knight immutable?
+                boolean hasWon = false;
+                if ((fenrirOwner!= null && fenrirOwner.equals("Knight"))
+                        || knight.has.containsKey("Fire")
+                        || knight.has.containsKey("Poisoned Sword")) {
+                    hasWon = true;
+                }
+                State newState = new State(knight, inactive, isGreeted, fenrirOwner, true, hasWon);
+                if (hasWon) {
+                    List<Pair<State, Action>> singlePath = new ArrayList<>();
+                    singlePath.add(Pair.of(newState, fightAction));
+                    return singlePath;
+                } else {
+                    plan.add(Pair.of(newState, fightAction));
+                }
+            }
+
+            GameCharacter tree = gameCharacterMap.get("Tree Spirit");
+            if (knight.has.containsKey("Axe") && knight.location.equals(tree.location)
+                    && !inactive.contains("Tree Spirit")) {
+                Action action = new Use(false, "Use", "Axe", "Tree Spirit", "Wood");
+                Set<String> newInactive = new HashSet<>(inactive);
+                newInactive.add("Tree Spirit");
+                State newState = new State(knight.removeObject("Axe", 1).addObject("Wood", 1),
+                        newInactive, isGreeted, fenrirOwner, hasFought, hasWon);
+                plan.add(Pair.of(newState, action));
+            }
+
+            if (knight.has.containsKey("Blade") && knight.has.containsKey("Wood")) {
+                List<String> removals = new ArrayList<>();
+                removals.add("Blade");
+                removals.add("Wood");
+                Knight newKnight = knight.addObject("Sword", 1).removeObjects(removals);
+                Action action = new Use(false, "Use", "Blade", "Wood", "Cheap Sword");
+                State newState = new State(newKnight, inactive, isGreeted, fenrirOwner, hasFought, hasWon);
+                plan.add(Pair.of(newState, action));
+            }
+
+            if (knight.has.containsKey("Sword") && knight.has.containsKey("Wolfsbane")) {
+                List<String> removals = new ArrayList<>();
+                removals.add("Sword");
+                removals.add("Wolfsbane");
+                Knight newKnight = knight.addObject("Poisoned Sword", 1).removeObjects(removals);
+                Action action = new Use(false, "Use", "Sword", "Wolfsbane", "Poisoned Sword");
+                State newState = new State(newKnight, inactive, isGreeted, fenrirOwner, hasFought, hasWon);
+                plan.add(Pair.of(newState, action));
+            }
+
+            if (knight.has.containsKey("Ale") && knight.has.containsKey("Wood")) {
+                List<String> removals = new ArrayList<>();
+                removals.add("Ale");
+                removals.add("Wood");
+                Knight newKnight = knight.addObject("Fire", 1).removeObjects(removals);
+                Action action = new Use(false, "Use", "Ale", "Wood", "Fire");
+                State newState = new State(newKnight, inactive, isGreeted, fenrirOwner, hasFought, hasWon);
+                plan.add(Pair.of(newState, action));
+            }
+
+            Collection<GameCharacter> gameCharacters = gameCharacterMap.values();
+            for (GameCharacter gc: gameCharacters) {
+                if (gc.name.equals("Knight") || inactive.contains(gc.name) || gc.name.equals("King")
+                        || !gc.location.equals(knight.location)) {
+                    continue;
+                }
+                List<String> wants = new ArrayList<>(gc.wants.keySet());
+                List<String> gcHas = new ArrayList<>(gc.has.keySet());
+                for (String want: wants) {
+                    if (knight.has.containsKey(want)) {
+                        for (String hass: gcHas) {
+                            if (hass.equals("Fenrir") && !fenrirOwner.equals(gc.name)) {
+                                continue;
+                            }
+                            Knight newKnight = knight.addObject(hass, 1).removeObject(want, 1);
+                            Action action = new Exchange(false, "Exchange", want, hass, gc.name);
+                            String newFenrirOwner;
+                            if (hass.equals("Fenrir")) {
+                                newFenrirOwner = "Knight";
+                            } else {
+                                newFenrirOwner = fenrirOwner;
+                            }
+                            State newState = new State(newKnight, inactive, isGreeted, newFenrirOwner, hasFought,
+                                    hasWon);
+                            plan.add(Pair.of(newState, action));
+                        }
+                    }
+                }
+            }
+
+            for (GameCharacter gc: gameCharacters) {
+                if (gc.name.equals("Knight") || inactive.contains(gc.name) || gc.name.equals("King")
+                        || gc.location.equals(knight.location) ) {
+                    continue;
+                }
+                Action moveAction = new Move(false, "Move", knight, gc);
+                State newState = new State(knight.changePosition(gc.location), inactive, isGreeted, fenrirOwner,
+                        hasFought, hasWon);
+                plan.add(Pair.of(newState, moveAction));
+            }
+
+            return plan;
+        }
+    }
+
+    public static class Action {
+        public boolean isSucceeded;
+        public String type;
+//        public boolean inProgress;
+
+        public void perform() {
+            if (type.equals("Fight")) {
+                System.out.println("Knight fights Rameses");
+            } else if (type.equals("Greet")) {
+                System.out.println("Knight greets King of Leighra");
+            }
+            isSucceeded = true;
+        }
+
+        public void perform(Knight knight, Graph graph) {
+            perform();
+        }
+
+        public Action(boolean isSucceeded, String type) {
+            this.isSucceeded = isSucceeded;
+            this.type = type;
+        }
+
+        @Override
+        public String toString() {
+            return "Action{" +
+                    "isSucceeded=" + isSucceeded +
+                    ", type='" + type + '\'' +
+                    '}';
+        }
+    }
+
+    public static class Exchange extends Action {
+        public String gave;
+        public String received;
+        public String otherParty;
+
+        public Exchange(boolean isSucceeded, String type, String gave, String received, String otherParty) {
+            super(isSucceeded, type);
+            this.gave = gave;
+            this.received = received;
+            this.otherParty = otherParty;
+        }
+
+        @Override
+        public void perform() {
+            System.out.println(otherParty + " wants " + gave);
+            System.out.println("Knight wants " + received);
+            System.out.println(String.format("Knight exchanges %s for %s", gave, received));
+            isSucceeded = true;
+        }
+    }
+
+    public static class Move extends Action {
+        public GameCharacter from;
+        public GameCharacter to;
+
+        public Move(boolean isSucceeded, String type, GameCharacter from, GameCharacter to) {
+            super(isSucceeded, type);
+            this.from = from;
+            this.to = to;
+        }
+
+        @Override
+        public void perform(Knight knight, Graph graph) {
+            if (knight.plan.isEmpty()) {
+                knight.plan = AStar(graph, vertex -> vertex.dist(to.location), knight.location, to.location);
+                knight.currentIndex = -1;
+                System.out.println("Knight moves to " + to.locationName);
+            }
+            PVector newLoc = knight.move();
+            knight.display();
+            if (newLoc == null || newLoc.equals(to.location)) {
+                isSucceeded = true;
+                knight.plan = new ArrayList<>();
+                knight.currentIndex = -1;
+            }
+        }
+    }
+
+    public static class Use extends Action {
+        public String first;
+        public String second;
+        public String third;
+
+        public Use(boolean isSucceeded, String type, String first, String second, String third) {
+            super(isSucceeded, type);
+            this.first = first;
+            this.second = second;
+            this.third = third;
+        }
+
+        @Override
+        public void perform() {
+            System.out.println(String.format("Knight uses %s and %s to get %s", first, second, third));
+            isSucceeded = true;
+        }
+    }
+
+    private static class Knight extends GameCharacter {
         public List<PVector> plan;
         public int currentIndex;
 
+        public Knight addObject(String object, int n) {
+            Map<String, Integer> newHas = new HashMap<>();
+            for (Map.Entry<String, Integer> entry: has.entrySet()) {
+                newHas.put(entry.getKey(), entry.getValue());
+            }
+            int val = newHas.getOrDefault(object, 0);
+            newHas.put(object, val+n);
+            //It's okay to reuse wants if it is not modified
+            Knight newKnight = new Knight(location, newHas, wants, img, name, locationName);
+            return newKnight;
+        }
+
+        public Knight removeObjects(List<String> objects) {
+            Map<String, Integer> newHas = new HashMap<>();
+            for (Map.Entry<String, Integer> entry: has.entrySet()) {
+                newHas.put(entry.getKey(), entry.getValue());
+            }
+            for (String obj: objects) {
+                int val = newHas.getOrDefault(obj, 0);
+                if (val == 1) {
+                    newHas.remove(obj);
+                } else {
+                    newHas.put(obj, val-1);
+                }
+            }
+            //It's okay to reuse wants if it is not modified
+            Knight newKnight = new Knight(location, newHas, wants, img, name, locationName);
+            return newKnight;
+        }
+
+        public Knight removeObject(String object, int n) {
+            Map<String, Integer> newHas = new HashMap<>();
+            for (Map.Entry<String, Integer> entry: has.entrySet()) {
+                newHas.put(entry.getKey(), entry.getValue());
+            }
+            int val = newHas.getOrDefault(object, 0);
+            if (val > n) {
+                newHas.put(object, val - n);
+            } else {
+                newHas.remove(object);
+            }
+            //It's okay to reuse wants if it is not modified
+            Knight newKnight = new Knight(location, newHas, wants, img, name, locationName);
+            return newKnight;
+        }
+
+        public Knight changePosition(PVector newLocation) {
+            return new Knight(newLocation, has, wants, img, name, locationName);
+        }
+
         public Knight(PVector location, Map<String, Integer> has, Map<String, Integer> wants, MyImage img,
-                      String name) {
-            super(location, has, wants, img, name);
+                      String name, String locationName) {
+            super(location, has, wants, img, name, locationName);
             this.plan = new ArrayList<>();
             this.currentIndex = -1;
         }
 
-        public Knight(PVector location, MyImage img, String name) {
-            super(location, img, name);
+        //TODO: Possible improvement here
+        public Knight(PVector location, MyImage img, String name, String locationName) {
+            super(location, img, name, locationName);
             this.plan = new ArrayList<>();
             this.currentIndex = -1;
         }
@@ -318,6 +745,21 @@ public class Decisions extends PApplet {
                 this.width = img.width*ratio;
                 this.height = img.height*ratio;
             }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            MyImage myImage = (MyImage) o;
+            return Float.compare(myImage.width, width) == 0 &&
+                    Float.compare(myImage.height, height) == 0 &&
+                    Objects.equals(img, myImage.img);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(img, width, height);
         }
     }
 
@@ -373,6 +815,58 @@ public class Decisions extends PApplet {
         public int hashCode() {
             return Objects.hash(first, second, distance);
         }
+    }
+
+    public List<Action> DFSUtil(State state, Set<State> visited) {
+//        System.out.println("Visited");
+//        for (State st: visited) {
+//            st.print();
+//            System.out.println("st.hashCode() = " + st.hashCode());
+//        }
+//        system.out.println("================");
+//        system.out.println("state");
+        visited.add(state);
+//        initialState.print();
+        if (state.hasFought) {
+            if (state.hasWon) {
+                return new ArrayList<>();
+            } else {
+                return null;
+            }
+        }
+        List<Pair<State, Action>> children = state.getNextStates(gameCharacterMap, kingGold);
+//        System.out.println("Children");
+//        System.out.println("children.size() = " + children.size());
+//        for (Pair<State, Action> child: children) {
+//            System.out.println("child.left.knight.location = " + child.left.knight.location);
+//            System.out.println("child.action = " + child.right);
+//        }
+        for (Pair<State, Action> next: children) {
+            if (next.left.hasWon && next.left.hasFought) {
+                List<Action> plan = new ArrayList<>();
+                plan.add(next.right);
+                return plan;
+            }
+        }
+        for (Pair<State, Action> child: children) {
+            if (!visited.contains(child.left)) {
+//                System.out.println("Chosen action = " + child.right);
+                List<Action> nextPlan = DFSUtil(child.left, visited);
+//                System.out.println("nextPlan = " + nextPlan);
+                if (nextPlan != null) {
+//                    System.out.println("next plan not null");
+                    nextPlan.add(child.right);
+//                    System.out.println("nextPlan after adding child = " + nextPlan);
+                    return nextPlan;
+                }
+            }
+        }
+        return null;
+    }
+
+    public List<Action> DFS(State initialState) {
+        Set<State> visited = new HashSet<>();
+        return DFSUtil(initialState, visited);
     }
 
     public static List<PVector> AStar(Graph g, Function<PVector, Float> hFun, PVector sourceV, PVector destV) {
@@ -432,7 +926,7 @@ public class Decisions extends PApplet {
         }
         Collections.reverse(finalPath);
         if (!finalPath.get(0).equals(sourceV)) {
-            return new ArrayList<>();
+            return null;
         }
         /*
         long temppl = 0L;
@@ -454,5 +948,36 @@ public class Decisions extends PApplet {
 //        System.out.println("Max. length of queue during search = " + maxQueueSize);
 //        System.out.println("Final path length = " + gFun.get(destV));
         return finalPath;
+    }
+
+
+    public static class Pair<L, R> {
+        private L left;
+        private R right;
+
+        private Pair(L left, R right) {
+            this.left = left;
+            this.right = right;
+        }
+
+        public L getLeft() {
+            return left;
+        }
+
+        public R getRight() {
+            return right;
+        }
+
+        public static <A, B> Pair<A, B> of(A a, B b) {
+            return new Pair<>(a, b);
+        }
+
+        @Override
+        public String toString() {
+            return "Pair{" +
+                    "left=" + left +
+                    ", right=" + right +
+                    '}';
+        }
     }
 }
